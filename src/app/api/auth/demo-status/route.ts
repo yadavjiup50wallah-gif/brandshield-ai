@@ -8,5 +8,13 @@ import { isDemoWorkspaceEnabled } from "@/lib/brandshield/server/seed";
  * real email/password + create-account flows.
  */
 export async function GET() {
-  return NextResponse.json({ demoEnabled: isDemoWorkspaceEnabled() });
+  const firebaseConfigured = Boolean(
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim() &&
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() &&
+    process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim()
+  );
+  return NextResponse.json({
+    demoEnabled: isDemoWorkspaceEnabled(),
+    firebaseConfigured,
+  });
 }

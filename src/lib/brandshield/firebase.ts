@@ -32,10 +32,10 @@ export interface FirebaseWebConfig {
 }
 
 export function getFirebaseConfig(): FirebaseWebConfig | null {
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
-  const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? (projectId ? `${projectId}.firebaseapp.com` : undefined);
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim();
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
+  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim();
+  const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim() ?? (projectId ? `${projectId}.firebaseapp.com` : undefined);
   if (!apiKey || !projectId || !appId) return null;
   return { apiKey, projectId, appId, authDomain: authDomain ?? `${projectId}.firebaseapp.com` };
 }

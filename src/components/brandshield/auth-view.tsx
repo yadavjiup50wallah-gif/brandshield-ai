@@ -30,6 +30,7 @@ import {
 } from "@/lib/brandshield/firebase";
 import { warmSignedInChunksWhenIdle } from "@/components/brandshield/lazy-views";
 import type { Role, SessionUser } from "@/lib/brandshield/types";
+import { DEMO_EMAILS } from "@/lib/brandshield/shared";
 import { cn, initials } from "@/lib/brandshield/utils";
 import { LangToggle, useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-auth";
@@ -198,15 +199,16 @@ export function AuthView({ onBack }: { onBack: () => void }) {
     e.preventDefault();
     if (busy) return;
     const finish = () => toast.success(t("auth.toast.signedIn"));
-    if (firebaseConnected) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (firebaseConnected && !DEMO_EMAILS.has(cleanEmail)) {
       setFirebaseBusy(true);
-      firebaseEmailSignIn(email.trim(), password)
+      firebaseEmailSignIn(cleanEmail, password)
         .then(finishFirebaseSession)
         .catch((err: Error) => toast.error(err.message))
         .finally(() => setFirebaseBusy(false));
       return;
     }
-    login.mutate({ email: email.trim(), password }, { onSuccess: finish });
+    login.mutate({ email: cleanEmail, password }, { onSuccess: finish });
   }
 
   function handleRegister(e: FormEvent) {

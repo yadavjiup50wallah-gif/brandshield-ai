@@ -149,3 +149,11 @@ export function initials(name: string): string {
 export function shortHash(hash: string): string {
   return hash.slice(0, 10) + "…" + hash.slice(-6);
 }
+
+// ─── Demo workspace personas ─────────────────────────────────────────────────
+export const DEMO_EMAILS = new Set([
+  "ava@nimbus.demo",
+  "marcus@nimbus.demo",
+  "priya@pixelworks.demo",
+  "elena@nimbus.demo",
+]);

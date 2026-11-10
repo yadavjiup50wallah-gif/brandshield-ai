@@ -1,7 +1,8 @@
 import { createHash } from "crypto";
 import { db } from "@/lib/db";
 import { chunkDocument } from "./engine";
-import { hashPassword } from "./password";
+import { hashPassword, verifyPassword } from "./password";
+import { DEMO_EMAILS } from "../shared";
 
 // ─── Seed content: Nimbus Labs brand governance workspace ────────────────────
 
@@ -141,22 +142,43 @@ export function ensureSeed(): Promise<void> {
 }
 
 async function seedInternal(): Promise<void> {
+  const demoPasswordHash = await hashPassword("demo1234");
+  const demoPersonas = [
+    { email: "ava@nimbus.demo", name: "Ava Chen", role: "creator", department: "Content Studio", avatarColor: "#0F766E" },
+    { email: "marcus@nimbus.demo", name: "Marcus Reed", role: "reviewer", department: "Brand & Legal", avatarColor: "#B45309" },
+    { email: "priya@pixelworks.demo", name: "Priya Sharma", role: "contractor", department: "PixelWorks Agency", avatarColor: "#7C2D12" },
+    { email: "elena@nimbus.demo", name: "Elena Rodriguez", role: "admin", department: "Marketing Leadership", avatarColor: "#4D7C0F" },
+  ];
+
   const existing = await db.organization.findUnique({ where: { slug: "nimbus-labs" } });
-  if (existing) return;
+  if (existing) {
+    // Self-healing: verify every demo persona exists and their password matches "demo1234"
+    for (const p of demoPersonas) {
+      const user = await db.user.findUnique({ where: { email: p.email } });
+      if (!user) {
+        await db.user.create({
+          data: { ...p, orgId: existing.id, password: demoPasswordHash },
+        });
+      } else {
+        const { valid } = await verifyPassword("demo1234", user.password);
+        if (!valid) {
+          await db.user.update({
+            where: { id: user.id },
+            data: { password: demoPasswordHash, orgId: existing.id },
+          });
+        }
+      }
+    }
+    return;
+  }
 
   // ── Organization + users (demo personas — passwords salted-scrypt hashed) ──
   const org = await db.organization.create({
     data: { name: "Nimbus Labs", slug: "nimbus-labs", zeroDataRetention: true },
   });
 
-  const demoPasswordHash = await hashPassword("demo1234");
   const [ava, marcus, priya, elena] = await Promise.all(
-    [
-      { email: "ava@nimbus.demo", name: "Ava Chen", role: "creator", department: "Content Studio", avatarColor: "#0F766E" },
-      { email: "marcus@nimbus.demo", name: "Marcus Reed", role: "reviewer", department: "Brand & Legal", avatarColor: "#B45309" },
-      { email: "priya@pixelworks.demo", name: "Priya Sharma", role: "contractor", department: "PixelWorks Agency", avatarColor: "#7C2D12" },
-      { email: "elena@nimbus.demo", name: "Elena Rodriguez", role: "admin", department: "Marketing Leadership", avatarColor: "#4D7C0F" },
-    ].map((u) => db.user.create({ data: { ...u, orgId: org.id, password: demoPasswordHash } }))
+    demoPersonas.map((u) => db.user.create({ data: { ...u, orgId: org.id, password: demoPasswordHash } }))
   );
 
   // ── Guideline documents + chunks

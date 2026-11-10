@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { SESSION_COOKIE, createSessionToken } from "@/lib/brandshield/server/auth";
-import { ensureSeed } from "@/lib/brandshield/server/seed";
+import { ensureSeed, isDemoWorkspaceEnabled } from "@/lib/brandshield/server/seed";
+import { DEMO_EMAILS } from "@/lib/brandshield/shared";
 import { jsonError } from "@/lib/brandshield/server/json";
 import { hashPassword, verifyPassword } from "@/lib/brandshield/server/password";
 import { checkRateLimit, clientIp } from "@/lib/brandshield/server/rate-limit";
@@ -51,18 +52,32 @@ export async function POST(req: NextRequest) {
       return firebaseError("auth/invalid-email", "That email address doesn't look right. Check the format — e.g. you@company.com.", 400);
     }
 
-    const user = await db.user.findUnique({ where: { email }, include: { organization: true } });
+    let user = await db.user.findUnique({ where: { email }, include: { organization: true } });
     if (!user) {
-      return firebaseError(
-        "auth/user-not-found",
-        "No account found for this email. Create one on the “Create account” tab, or use a one-click demo persona.",
-        401
-      );
+      if (isDemoWorkspaceEnabled() && DEMO_EMAILS.has(email) && password === "demo1234") {
+        await ensureSeed();
+        user = await db.user.findUnique({ where: { email }, include: { organization: true } });
+      }
+      if (!user) {
+        return firebaseError(
+          "auth/user-not-found",
+          "No account found for this email. Create one on the “Create account” tab, or use a one-click demo persona.",
+          401
+        );
+      }
     }
 
     const { valid, needsUpgrade } = await verifyPassword(password ?? "", user.password);
     if (!valid) {
-      return firebaseError("auth/wrong-password", "Incorrect password. Demo accounts use “demo1234”.", 401);
+      // Self-healing for official demo personas when demo workspace is active:
+      // If authenticating an official demo persona with "demo1234", heal the hash in the DB
+      // to resolve any legacy, desynchronized, or unusable password states transparently.
+      if (isDemoWorkspaceEnabled() && DEMO_EMAILS.has(email) && password === "demo1234") {
+        const healedHash = await hashPassword("demo1234");
+        await db.user.update({ where: { id: user.id }, data: { password: healedHash } });
+      } else {
+        return firebaseError("auth/wrong-password", "Incorrect password. Demo accounts use “demo1234”.", 401);
+      }
     }
 
     // Transparently upgrade legacy plaintext rows to salted scrypt hashes.
